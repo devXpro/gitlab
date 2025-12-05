@@ -1,0 +1,158 @@
+# GitLab CE Docker Compose Setup
+# ARM64 compatible (Apple Silicon, Raspberry Pi, etc.)
+# 
+# Usage:
+#   1. cp .env.sample .env
+#   2. Edit .env with your settings
+#   3. docker compose up -d
+#   4. Wait ~5 minutes for GitLab to initialize
+#   5. Run ./scripts/register-runner.sh to register the runner
+
+services:
+  # ===========================================
+  # GITLAB CE SERVER
+  # ===========================================
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    hostname: ${GITLAB_HOSTNAME:-gitlab.local}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      GITLAB_OMNIBUS_CONFIG: |
+        # External URL (no https - nginx proxy handles TLS)
+        external_url 'http://${GITLAB_HOSTNAME:-gitlab.local}'
+        
+        # SSH settings
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-2222}
+        
+        # Initial root password
+        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-ChangeMe123!}'
+        
+        # Container Registry
+        registry_external_url 'http://${GITLAB_HOSTNAME:-gitlab.local}:${GITLAB_REGISTRY_PORT:-5050}'
+        gitlab_rails['registry_enabled'] = true
+        registry['enable'] = true
+        registry_nginx['enable'] = true
+        registry_nginx['listen_port'] = 5050
+        registry_nginx['listen_https'] = false
+        
+        # Package Registry (npm, pypi, maven, etc.) - enabled by default
+        gitlab_rails['packages_enabled'] = true
+
+        # SMTP / Email configuration (MailerSend)
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "${SMTP_ADDRESS:-smtp.mailersend.net}"
+        gitlab_rails['smtp_port'] = ${SMTP_PORT:-587}
+        gitlab_rails['smtp_user_name'] = "${SMTP_USERNAME}"
+        gitlab_rails['smtp_password'] = "${SMTP_PASSWORD}"
+        gitlab_rails['smtp_domain'] = "${SMTP_DOMAIN:-mailersend.net}"
+        gitlab_rails['smtp_authentication'] = "plain"
+        gitlab_rails['smtp_enable_starttls_auto'] = true
+        gitlab_rails['smtp_tls'] = false
+        gitlab_rails['smtp_openssl_verify_mode'] = 'peer'
+
+        # Email sender settings
+        gitlab_rails['gitlab_email_enabled'] = true
+        gitlab_rails['gitlab_email_from'] = "${GITLAB_EMAIL_FROM}"
+        gitlab_rails['gitlab_email_display_name'] = "${GITLAB_EMAIL_DISPLAY_NAME:-GitLab}"
+        gitlab_rails['gitlab_email_reply_to'] = "${GITLAB_EMAIL_REPLY_TO}"
+        gitlab_rails['gitlab_email_subject_suffix'] = "${GITLAB_EMAIL_SUBJECT_SUFFIX:-}"
+
+        # Disable unnecessary services to save resources
+        prometheus_monitoring['enable'] = false
+        alertmanager['enable'] = false
+        node_exporter['enable'] = false
+        redis_exporter['enable'] = false
+        postgres_exporter['enable'] = false
+        pgbouncer_exporter['enable'] = false
+        gitlab_exporter['enable'] = false
+
+        # Disable GitLab Pages (enable if needed)
+        pages_external_url nil
+        gitlab_pages['enable'] = false
+        
+        # Puma settings (reduce memory usage)
+        puma['worker_processes'] = 2
+        puma['min_threads'] = 1
+        puma['max_threads'] = 4
+        
+        # Sidekiq settings
+        sidekiq['max_concurrency'] = 10
+        
+        # PostgreSQL settings
+        postgresql['shared_buffers'] = "256MB"
+        
+        # Nginx settings
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        
+        # Disable Let's Encrypt
+        letsencrypt['enable'] = false
+    ports:
+      - "${GITLAB_HTTP_PORT:-8080}:80"
+      - "${GITLAB_REGISTRY_PORT:-5050}:5050"
+      - "${GITLAB_SSH_PORT:-2222}:22"
+    volumes:
+      - ${GITLAB_HOME:-./data/gitlab}/config:/etc/gitlab
+      - ${GITLAB_HOME:-./data/gitlab}/logs:/var/log/gitlab
+      - ${GITLAB_HOME:-./data/gitlab}/data:/var/opt/gitlab
+    shm_size: '256m'
+    networks:
+      - gitlab-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/-/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s  # GitLab needs time to initialize
+
+  # ===========================================
+  # GITLAB RUNNER
+  # ===========================================
+  gitlab-runner:
+    image: gitlab/gitlab-runner:alpine
+    container_name: gitlab-runner
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ${RUNNER_CONFIG_PATH:-./data/runner/config}:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gitlab-network
+    depends_on:
+      gitlab:
+        condition: service_healthy
+
+  # ===========================================
+  # DOCKER-IN-DOCKER (for building images in CI/CD)
+  # ===========================================
+  dind:
+    image: docker:dind
+    container_name: gitlab-dind
+    restart: unless-stopped
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""  # Disable TLS for simplicity in local dev
+      DOCKER_DRIVER: overlay2
+    volumes:
+      - dind-storage:/var/lib/docker
+    networks:
+      - gitlab-network
+    command: ["--storage-driver=overlay2"]
+
+# ===========================================
+# NETWORKS
+# ===========================================
+networks:
+  gitlab-network:
+    driver: bridge
+    name: gitlab-network
+
+# ===========================================
+# VOLUMES
+# ===========================================
+volumes:
+  dind-storage:
+    driver: local

@@ -1,0 +1,417 @@
+# GitLab CE Docker Compose Setup
+
+Full-featured self-hosted GitLab with Container Registry, Package Registry (npm, PyPI, Maven, etc.), and GitLab Runners.
+
+**ARM64 Compatible** - Works on Apple Silicon (M1/M2/M3), Raspberry Pi, and other ARM64 platforms.
+
+## Features
+
+- ✅ **GitLab CE** - Full GitLab Community Edition
+- ✅ **Container Registry** - Store and manage Docker images
+- ✅ **Package Registry** - npm, PyPI, Maven, NuGet, Composer, etc.
+- ✅ **GitLab Runner** - CI/CD with Docker executor
+- ✅ **Docker-in-Docker** - Build Docker images in pipelines
+- ✅ **Host Volumes** - Easy backup and migration
+- ✅ **ARM64 Support** - Native support for Apple Silicon and ARM devices
+
+## Prerequisites
+
+- Docker Engine 20.10+ or Docker Desktop
+- Docker Compose v2.0+
+- At least 4GB RAM (8GB recommended)
+- 10GB+ free disk space
+
+## Quick Start
+
+### 1. Clone and Configure
+
+```bash
+# Copy environment template
+cp .env.sample .env
+
+# Edit configuration
+nano .env
+```
+
+**Important settings in `.env`:**
+- `GITLAB_HOSTNAME` - Your GitLab hostname (e.g., `gitlab.local`)
+- `GITLAB_ROOT_PASSWORD` - Initial root password (min 8 chars)
+- `GITLAB_SSH_PORT` - SSH port for git operations (default: 2222)
+- `GITLAB_HTTP_PORT` - HTTP port for web UI (default: 8080)
+- `GITLAB_REGISTRY_PORT` - Container registry port (default: 5050)
+
+### 2. Add Hostname to /etc/hosts
+
+```bash
+# Add this line to /etc/hosts
+127.0.0.1 gitlab.local
+```
+
+Or use your actual hostname if deploying on a server.
+
+### 3. Start GitLab
+
+```bash
+docker compose up -d
+```
+
+**First startup takes 3-5 minutes** while GitLab initializes.
+
+Check status:
+```bash
+docker compose logs -f gitlab
+```
+
+Wait for: `gitlab Reconfigured!` message.
+
+### 4. Access GitLab
+
+Open: `http://gitlab.local:8080` (or your configured hostname/port)
+
+**Login:**
+- Username: `root`
+- Password: From `.env` file (`GITLAB_ROOT_PASSWORD`)
+
+### 5. Register GitLab Runner
+
+```bash
+./scripts/register-runner.sh
+```
+
+Follow the prompts to get the registration token from GitLab UI:
+1. Go to **Admin Area** → **CI/CD** → **Runners**
+2. Click **New instance runner**
+3. Copy the registration token
+4. Paste it when prompted by the script
+
+### 6. Configure Email (Optional)
+
+GitLab is configured to use **MailerSend** for sending emails (notifications, password resets, etc.).
+
+#### Setup MailerSend:
+
+1. **Create MailerSend account**: https://app.mailersend.com/
+
+2. **Add and verify your domain**:
+   - Go to **Domains** → **Add Domain**
+   - Add DNS records (SPF, DKIM, CNAME)
+   - Wait for verification
+
+3. **Get SMTP credentials**:
+   - Go to **Domains** → Your domain → **SMTP**
+   - Copy **Username** and **Password**
+
+4. **Update `.env` file**:
+   ```bash
+   SMTP_USERNAME=your-mailersend-username
+   SMTP_PASSWORD=your-mailersend-password
+   GITLAB_EMAIL_FROM=gitlab@yourdomain.com
+   GITLAB_EMAIL_REPLY_TO=noreply@yourdomain.com
+   ```
+
+5. **Restart GitLab**:
+   ```bash
+   docker compose down
+   docker compose up -d
+   ```
+
+6. **Test email** (optional):
+   ```bash
+   docker exec -it gitlab gitlab-rails console
+
+   # In Rails console:
+   Notify.test_email('test@example.com', 'Test Subject', 'Test Body').deliver_now
+   ```
+
+**Note**: Email address in `GITLAB_EMAIL_FROM` must be verified in MailerSend.
+
+## Usage
+
+### Container Registry
+
+#### Push Docker Image
+
+```bash
+# Login to registry
+docker login gitlab.local:5050
+# Username: your-gitlab-username
+# Password: your-gitlab-password or access token
+
+# Tag your image
+docker tag my-image:latest gitlab.local:5050/group/project/my-image:latest
+
+# Push
+docker push gitlab.local:5050/group/project/my-image:latest
+```
+
+#### Pull Docker Image
+
+```bash
+docker pull gitlab.local:5050/group/project/my-image:latest
+```
+
+### Package Registry (npm)
+
+#### Publish npm Package
+
+```bash
+# Create .npmrc in your project
+echo "@scope:registry=http://gitlab.local:8080/api/v4/projects/PROJECT_ID/packages/npm/" > .npmrc
+echo "//gitlab.local:8080/api/v4/projects/PROJECT_ID/packages/npm/:_authToken=YOUR_TOKEN" >> .npmrc
+
+# Publish
+npm publish
+```
+
+#### Install npm Package
+
+```bash
+# Add to .npmrc
+echo "@scope:registry=http://gitlab.local:8080/api/v4/packages/npm/" >> .npmrc
+
+# Install
+npm install @scope/package-name
+```
+
+### CI/CD Pipeline Example
+
+Create `.gitlab-ci.yml`:
+
+```yaml
+stages:
+  - build
+  - test
+
+build-job:
+  stage: build
+  tags:
+    - docker
+    - linux
+    - arm64
+  script:
+    - echo "Building..."
+    - docker build -t my-app .
+  
+test-job:
+  stage: test
+  tags:
+    - docker
+  script:
+    - echo "Testing..."
+    - npm test
+```
+
+## Management
+
+### View Logs
+
+```bash
+# All services
+docker compose logs -f
+
+# GitLab only
+docker compose logs -f gitlab
+
+# Runner only
+docker compose logs -f gitlab-runner
+```
+
+### Restart Services
+
+```bash
+docker compose restart
+```
+
+### Stop Services
+
+```bash
+docker compose down
+```
+
+### Backup
+
+```bash
+# Backup all data
+tar -czf gitlab-backup-$(date +%Y%m%d).tar.gz data/
+```
+
+### Restore
+
+```bash
+# Stop services
+docker compose down
+
+# Restore data
+tar -xzf gitlab-backup-YYYYMMDD.tar.gz
+
+# Start services
+docker compose up -d
+```
+
+## Troubleshooting
+
+### GitLab not starting
+
+Check logs:
+```bash
+docker compose logs gitlab
+```
+
+Common issues:
+- Not enough memory (need 4GB+)
+- Port conflicts (check ports 8080, 5050, 2222)
+- Permissions on `data/` directory
+
+### Runner not connecting
+
+1. Check runner is registered:
+```bash
+docker exec gitlab-runner gitlab-runner list
+```
+
+2. Verify runner in GitLab UI: **Admin Area** → **CI/CD** → **Runners**
+
+3. Re-register if needed:
+```bash
+./scripts/register-runner.sh
+```
+
+### Container Registry 404
+
+Make sure you're using the correct URL format:
+```
+gitlab.local:5050/group/project/image:tag
+```
+
+### npm Registry 403 Forbidden
+
+1. Check authentication token is valid
+2. Verify project ID in `.npmrc`
+3. Ensure package name matches scope: `@scope/package-name`
+
+### Email not sending
+
+1. **Check SMTP credentials** in `.env`:
+   ```bash
+   cat .env | grep SMTP
+   ```
+
+2. **Verify email configuration**:
+   ```bash
+   docker exec -it gitlab gitlab-rails console
+
+   # Check SMTP settings:
+   ActionMailer::Base.smtp_settings
+   ```
+
+3. **Test email delivery**:
+   ```bash
+   docker exec -it gitlab gitlab-rails console
+
+   # Send test email:
+   Notify.test_email('your-email@example.com', 'Test', 'Test message').deliver_now
+   ```
+
+4. **Check GitLab logs**:
+   ```bash
+   docker exec gitlab tail -f /var/log/gitlab/gitlab-rails/production.log
+   ```
+
+5. **Common issues**:
+   - Email address not verified in MailerSend
+   - Domain not verified (check SPF, DKIM, CNAME records)
+   - Wrong SMTP credentials
+   - Firewall blocking port 587
+   - MailerSend rate limits exceeded
+
+## Advanced Configuration
+
+### External Nginx Proxy
+
+If using external nginx for TLS:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name gitlab.example.com;
+    
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Container Registry
+server {
+    listen 5050 ssl;
+    server_name gitlab.example.com;
+    
+    location / {
+        proxy_pass http://localhost:5050;
+        proxy_set_header Host $host;
+    }
+}
+```
+
+### Resource Limits
+
+Uncomment in `.env`:
+```bash
+GITLAB_MEMORY_LIMIT=4g
+GITLAB_CPU_LIMIT=2
+```
+
+## Ports
+
+| Service | Port | Description |
+|---------|------|-------------|
+| GitLab Web | 8080 | Web interface |
+| GitLab SSH | 2222 | Git over SSH |
+| Container Registry | 5050 | Docker registry |
+
+## Architecture
+
+```
+┌─────────────────┐
+│  External Nginx │ (Optional, for TLS)
+│   (Port 443)    │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│     GitLab      │
+│  (Port 8080)    │
+│                 │
+│  - Web UI       │
+│  - API          │
+│  - Registry     │
+│  - Packages     │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│  GitLab Runner  │
+│                 │
+│  - Docker exec  │
+│  - CI/CD jobs   │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│  Docker-in-     │
+│  Docker (dind)  │
+│                 │
+│  - Build images │
+└─────────────────┘
+```
+
+## License
+
+This setup uses GitLab Community Edition (CE) which is open source under the MIT License.
+
+## Support
+
+- [GitLab Documentation](https://docs.gitlab.com/)
+- [GitLab Forum](https://forum.gitlab.com/)
+- [Docker Documentation](https://docs.docker.com/)
+
