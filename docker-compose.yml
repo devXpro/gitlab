@@ -22,19 +22,21 @@ services:
       GITLAB_OMNIBUS_CONFIG: |
         # External URL (no https - nginx proxy handles TLS)
         external_url 'http://${GITLAB_HOSTNAME:-gitlab.local}'
-        
+
         # SSH settings
         gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-2222}
-        
+
         # Initial root password
         gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-ChangeMe123!}'
-        
+
         # Container Registry
-        registry_external_url 'http://${GITLAB_HOSTNAME:-gitlab.local}:${GITLAB_REGISTRY_PORT:-5050}'
+        # For Cloudflare setup: use separate subdomain without port (e.g., https://registry.example.com)
+        # For local setup: use hostname with port (e.g., http://gitlab.local:5050)
+        registry_external_url '${GITLAB_REGISTRY_EXTERNAL_URL:-http://${GITLAB_HOSTNAME:-gitlab.local}:${GITLAB_REGISTRY_PORT:-5050}}'
         gitlab_rails['registry_enabled'] = true
         registry['enable'] = true
         registry_nginx['enable'] = true
-        registry_nginx['listen_port'] = 5050
+        registry_nginx['listen_port'] = ${GITLAB_REGISTRY_PORT:-5050}
         registry_nginx['listen_https'] = false
         
         # Package Registry (npm, pypi, maven, etc.) - enabled by default
