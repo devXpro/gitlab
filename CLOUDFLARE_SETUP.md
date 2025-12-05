@@ -232,7 +232,28 @@ docker push registry.yourdomain.com/group/project/myimage:latest
 ./scripts/register-runner.sh
 ```
 
-Follow prompts to get registration token from GitLab UI.
+The script will automatically detect your production setup and show the correct URL (`https://git.yourdomain.com`).
+
+**Get registration token:**
+1. Go to `https://git.yourdomain.com`
+2. Login as root
+3. Go to **Admin Area** → **CI/CD** → **Runners**
+4. Click **New instance runner**
+5. Select **Linux** platform
+6. Copy the registration token (starts with `glrt-`)
+7. Paste it when prompted by the script
+
+**Configure runner after registration:**
+1. Go to **Admin Area** → **CI/CD** → **Runners**
+2. Find your runner and click **Edit**
+3. Configure:
+   - **Description**: `docker-runner` (or any name)
+   - **Tags**: `docker`, `linux`, `arm64`
+   - **Run untagged jobs**: Enable if needed
+
+**Important:**
+- GitLab 16.0+ changed runner registration workflow. Tags and description are now configured in the UI.
+- The runner communicates with GitLab via internal Docker network (`http://gitlab`), not via your external domain. This is correct and secure - all communication stays within the Docker network.
 
 ## Troubleshooting
 

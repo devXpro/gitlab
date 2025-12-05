@@ -52,7 +52,14 @@ echo ""
 echo -e "${YELLOW}To register the runner, you need a registration token.${NC}"
 echo ""
 echo "Get it from GitLab:"
-echo "  1. Go to http://${GITLAB_HOSTNAME:-gitlab.local}:${GITLAB_HTTP_PORT:-8080}"
+# Determine the correct URL based on setup
+if [[ "${GITLAB_HOSTNAME}" == *"."* ]] && [[ -z "${GITLAB_HTTP_PORT}" || "${GITLAB_HTTP_PORT}" == "80" || "${GITLAB_HTTP_PORT}" == "443" ]]; then
+    # Production setup with domain (Cloudflare/Nginx)
+    echo "  1. Go to https://${GITLAB_HOSTNAME}"
+else
+    # Local development setup
+    echo "  1. Go to http://${GITLAB_HOSTNAME:-gitlab.local}:${GITLAB_HTTP_PORT:-8080}"
+fi
 echo "  2. Login as root (password from .env or initial_root_password)"
 echo "  3. Go to Admin Area -> CI/CD -> Runners"
 echo "  4. Click 'New instance runner' and copy the token"
@@ -73,6 +80,10 @@ fi
 # Register the runner
 echo ""
 echo -e "${YELLOW}Registering runner...${NC}"
+echo ""
+echo -e "${YELLOW}Note: GitLab 16.0+ uses new runner registration workflow.${NC}"
+echo -e "${YELLOW}Tags, description, and other settings are configured in GitLab UI.${NC}"
+echo ""
 
 docker exec gitlab-runner gitlab-runner register \
     --non-interactive \
@@ -83,19 +94,32 @@ docker exec gitlab-runner gitlab-runner register \
     --docker-privileged \
     --docker-volumes "/var/run/docker.sock:/var/run/docker.sock" \
     --docker-volumes "/cache" \
-    --docker-network-mode "gitlab-network" \
-    --description "$RUNNER_NAME" \
-    --tag-list "$RUNNER_TAGS"
+    --docker-network-mode "gitlab-network"
 
-echo ""
-echo -e "${GREEN}=== Runner registered successfully! ===${NC}"
-echo ""
-echo "The runner is now available in GitLab."
-echo "You can verify it at: Admin Area -> CI/CD -> Runners"
-echo ""
-echo "To use this runner in your .gitlab-ci.yml, add tags:"
-echo "  tags:"
-echo "    - docker"
-echo "    - linux"
-echo "    - arm64"
+if [ $? -eq 0 ]; then
+    echo ""
+    echo -e "${GREEN}=== Runner registered successfully! ===${NC}"
+    echo ""
+    echo "The runner is now available in GitLab."
+    echo ""
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo "1. Go to Admin Area → CI/CD → Runners"
+    echo "2. Find your runner and click 'Edit'"
+    echo "3. Configure:"
+    echo "   - Description: docker-runner (or any name)"
+    echo "   - Tags: docker, linux, arm64"
+    echo "   - Run untagged jobs: Enable if needed"
+    echo ""
+    echo "To use this runner in your .gitlab-ci.yml, add tags:"
+    echo "  tags:"
+    echo "    - docker"
+    echo "    - linux"
+    echo "    - arm64"
+else
+    echo ""
+    echo -e "${RED}=== Runner registration failed! ===${NC}"
+    echo ""
+    echo "Check the error message above for details."
+    exit 1
+fi
 

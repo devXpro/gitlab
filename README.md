@@ -78,11 +78,24 @@ Open: `http://gitlab.local:8080` (or your configured hostname/port)
 ./scripts/register-runner.sh
 ```
 
-Follow the prompts to get the registration token from GitLab UI:
+**Get registration token:**
 1. Go to **Admin Area** → **CI/CD** → **Runners**
 2. Click **New instance runner**
-3. Copy the registration token
-4. Paste it when prompted by the script
+3. Select **Linux** platform
+4. Copy the registration token (starts with `glrt-`)
+5. Paste it when prompted by the script
+
+**Configure runner after registration:**
+1. Go to **Admin Area** → **CI/CD** → **Runners**
+2. Find your runner and click **Edit**
+3. Configure:
+   - **Description**: `docker-runner` (or any name)
+   - **Tags**: `docker`, `linux`, `arm64`
+   - **Run untagged jobs**: Enable if needed
+
+**Note:** GitLab 16.0+ changed runner registration. Tags and description are now configured in the UI, not during registration.
+
+The runner communicates with GitLab via internal Docker network (`http://gitlab`), regardless of your external setup.
 
 ### 6. Configure Email (Optional)
 
