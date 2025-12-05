@@ -24,7 +24,8 @@ services:
         external_url 'http://${GITLAB_HOSTNAME:-gitlab.local}'
 
         # SSH settings
-        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-2222}
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-22}
+        gitlab_rails['gitlab_ssh_host'] = '${GITLAB_SSH_HOST:-${GITLAB_HOSTNAME:-gitlab.local}}'
 
         # Initial root password
         gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-ChangeMe123!}'
@@ -94,7 +95,7 @@ services:
     ports:
       - "${GITLAB_HTTP_PORT:-8080}:80"
       - "${GITLAB_REGISTRY_PORT:-5050}:5050"
-      - "${GITLAB_SSH_PORT:-2222}:22"
+      - "${GITLAB_SSH_EXTERNAL_PORT:-2222}:22"
     volumes:
       - ${GITLAB_HOME:-./data/gitlab}/config:/etc/gitlab
       - ${GITLAB_HOME:-./data/gitlab}/logs:/var/log/gitlab

@@ -7,10 +7,12 @@ This guide explains how to deploy GitLab with Cloudflare proxy for SSL terminati
 ```
 User → Cloudflare (HTTPS) → Your Server (HTTPS:443 self-signed) → GitLab (HTTP:8080)
 User → Cloudflare (HTTPS) → Your Server (HTTPS:443 self-signed) → Registry (HTTP:5050)
-User → Direct SSH → Your Server (SSH:2222) → GitLab SSH
+User → Direct SSH (DNS-only) → Your Server (SSH:22) → GitLab SSH
 ```
 
 **Security:** Communication between Cloudflare and your server is encrypted with self-signed SSL certificate (Full Strict mode).
+
+**Important:** SSH traffic bypasses Cloudflare proxy (uses DNS-only mode) because Cloudflare Proxied mode only supports HTTP/HTTPS traffic.
 
 ## Benefits
 
@@ -26,13 +28,13 @@ User → Direct SSH → Your Server (SSH:2222) → GitLab SSH
 
 - Domain registered in Cloudflare
 - Server with Docker and Docker Compose
-- Ports 80, 443, 2222 open on server firewall
+- Ports 22, 80, 443 open on server firewall
 
 ## Step 1: Cloudflare DNS Configuration
 
 1. Go to Cloudflare Dashboard → Your Domain → DNS → Records
 
-2. Create two A records:
+2. Create three A records:
 
    **GitLab Web Interface:**
    ```
@@ -52,12 +54,24 @@ User → Direct SSH → Your Server (SSH:2222) → GitLab SSH
    TTL: Auto
    ```
 
+   **GitLab SSH (IMPORTANT!):**
+   ```
+   Type: A
+   Name: git-ssh
+   Content: YOUR_SERVER_IP
+   Proxy status: DNS only (gray cloud) ⚠️ MUST BE GRAY!
+   TTL: Auto
+   ```
+
+   **Why gray cloud for SSH?** Cloudflare Proxied mode (orange cloud) only supports HTTP/HTTPS traffic. SSH traffic must bypass Cloudflare proxy and go directly to your server.
+
 3. Wait 1-5 minutes for DNS propagation
 
 4. Verify DNS:
    ```bash
    dig git.yourdomain.com
    dig registry.yourdomain.com
+   dig git-ssh.yourdomain.com
    ```
 
 ## Step 2: Cloudflare SSL/TLS Configuration
@@ -129,6 +143,9 @@ nano .env
 **Update these values:**
 ```bash
 GITLAB_HOSTNAME=git.yourdomain.com
+GITLAB_SSH_HOST=git-ssh.yourdomain.com
+GITLAB_SSH_PORT=22
+GITLAB_SSH_EXTERNAL_PORT=22
 GITLAB_REGISTRY_EXTERNAL_URL=https://registry.yourdomain.com
 GITLAB_ROOT_PASSWORD=YourStrongPassword123!
 
@@ -182,14 +199,17 @@ systemctl reload nginx
 ufw allow 80/tcp
 ufw allow 443/tcp
 
-# Allow SSH for Git operations
-ufw allow 2222/tcp
+# Allow SSH for Git operations (standard SSH port)
+ufw allow 22/tcp
 
 # Check status
 ufw status
 ```
 
-**Important:** Do NOT open port 8080 or 5050 to public!
+**Important:**
+- Do NOT open port 8080 or 5050 to public!
+- Port 22 is used for GitLab SSH (git clone/push/pull)
+- If you need SSH access to the server itself, configure it on a different port (e.g., 2222) before enabling firewall
 
 ### 4.7. Start GitLab
 
@@ -213,7 +233,24 @@ Wait for message: `gitlab Reconfigured!` (takes 3-5 minutes)
 
 3. Change root password in UI
 
-## Step 6: Test Container Registry
+## Step 6: Test SSH Access
+
+```bash
+# Test SSH connection
+ssh -T git@git-ssh.yourdomain.com
+
+# Expected output:
+# Welcome to GitLab, @username!
+```
+
+**Clone repository:**
+```bash
+git clone git@git-ssh.yourdomain.com:group/project.git
+```
+
+**Note:** No port needed! Standard SSH port 22 is used.
+
+## Step 7: Test Container Registry
 
 ```bash
 # Login to registry
@@ -226,7 +263,7 @@ docker tag myimage:latest registry.yourdomain.com/group/project/myimage:latest
 docker push registry.yourdomain.com/group/project/myimage:latest
 ```
 
-## Step 7: Register GitLab Runner
+## Step 8: Register GitLab Runner
 
 ```bash
 ./scripts/register-runner.sh
