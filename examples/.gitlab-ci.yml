@@ -3,6 +3,10 @@
 # - Building and testing a Node.js application
 # - Building and pushing Docker images to Container Registry
 # - Publishing npm packages to Package Registry
+#
+# Runner Configuration:
+# This pipeline uses Socket Mounting approach (runner has access to host Docker)
+# No need for docker:dind service - jobs use host Docker daemon directly
 
 # Define pipeline stages
 stages:
@@ -15,11 +19,7 @@ stages:
 variables:
   # Docker image for Node.js jobs
   NODE_IMAGE: node:20-alpine
-  
-  # Docker-in-Docker settings
-  DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: ""
-  
+
   # Container Registry
   IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
   IMAGE_LATEST: $CI_REGISTRY_IMAGE:latest
@@ -88,13 +88,12 @@ test-lint:
 # ===========================================
 
 # Build and push Docker image
+# Uses host Docker daemon via socket mounting (no dind service needed)
 docker-build:
   stage: package
   image: docker:latest
   tags:
     - docker
-  services:
-    - docker:dind
   before_script:
     - echo "Logging into Container Registry..."
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY

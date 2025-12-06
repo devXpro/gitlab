@@ -65,17 +65,25 @@ Wait for: `gitlab Reconfigured!` message in logs.
 
 **First time?** Change your password in: **User Settings** → **Password**
 
-## Step 6: Register Runner (1 minute)
+## Step 6: Register Runner (2 minutes)
 
+**IMPORTANT: Create runner in UI first (GitLab 16.0+ requirement)**
+
+1. Go to **Admin Area** → **CI/CD** → **Runners**
+2. Click **New instance runner**
+3. Configure:
+   - Platform: **Linux**
+   - Tags: `docker`, `linux`, `arm64`
+   - Run untagged jobs: ✓ **Enable**
+4. Click **Create runner**
+5. Copy authentication token (starts with `glrt-`)
+
+Then register:
 ```bash
 make register-runner
 ```
 
-Follow prompts:
-1. Go to **Admin Area** → **CI/CD** → **Runners**
-2. Click **New instance runner**
-3. Copy registration token
-4. Paste when prompted
+Paste the token when prompted.
 
 ## Done! 🎉
 

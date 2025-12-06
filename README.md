@@ -9,8 +9,8 @@ Full-featured self-hosted GitLab with Container Registry, Package Registry (npm,
 - ✅ **GitLab CE** - Full GitLab Community Edition
 - ✅ **Container Registry** - Store and manage Docker images
 - ✅ **Package Registry** - npm, PyPI, Maven, NuGet, Composer, etc.
-- ✅ **GitLab Runner** - CI/CD with Docker executor
-- ✅ **Docker-in-Docker** - Build Docker images in pipelines
+- ✅ **GitLab Runner** - CI/CD with Docker executor (socket mounting)
+- ✅ **Docker Support** - Build Docker images in pipelines using host Docker
 - ✅ **Host Volumes** - Easy backup and migration
 - ✅ **ARM64 Support** - Native support for Apple Silicon and ARM devices
 
@@ -74,26 +74,32 @@ Open: `http://gitlab.local:8080` (or your configured hostname/port)
 
 ### 5. Register GitLab Runner
 
-```bash
-./scripts/register-runner.sh
-```
+**IMPORTANT: GitLab 16.0+ requires creating the runner in UI first!**
 
-**Get registration token:**
+**Step 1: Create runner in GitLab UI**
 1. Go to **Admin Area** → **CI/CD** → **Runners**
 2. Click **New instance runner**
 3. Select **Linux** platform
-4. Copy the registration token (starts with `glrt-`)
-5. Paste it when prompted by the script
+4. Configure settings:
+   - **Tags**: `docker`, `linux`, `arm64` (or any tags you want)
+   - **Run untagged jobs**: ✓ Enable (recommended)
+5. Click **Create runner**
+6. Copy the authentication token (starts with `glrt-`)
 
-**Configure runner after registration:**
-1. Go to **Admin Area** → **CI/CD** → **Runners**
-2. Find your runner and click **Edit**
-3. Configure:
-   - **Description**: `docker-runner` (or any name)
-   - **Tags**: `docker`, `linux`, `arm64`
-   - **Run untagged jobs**: Enable if needed
+**Step 2: Register runner with token**
+```bash
+./scripts/register-runner.sh
+```
+Paste the token when prompted.
 
-**Note:** GitLab 16.0+ changed runner registration. Tags and description are now configured in the UI, not during registration.
+**Runner Configuration:**
+- **Executor**: Docker with socket mounting
+- **Default image**: `alpine:latest`
+- **Docker access**: Via host Docker socket (`/var/run/docker.sock`)
+- **Network**: `gitlab-network` (internal Docker network)
+- **Privileged mode**: Enabled (required for Docker operations)
+
+**Note:** All runner settings (tags, description, etc.) are configured in GitLab UI before registration. This is the new workflow in GitLab 16.0+.
 
 The runner communicates with GitLab via internal Docker network (`http://gitlab`), regardless of your external setup.
 

@@ -113,6 +113,9 @@ services:
   # ===========================================
   # GITLAB RUNNER
   # ===========================================
+  # Uses Docker Socket Mounting approach for local development
+  # This allows jobs to use the host's Docker daemon directly
+  # For production, consider using Docker-in-Docker per job instead
   gitlab-runner:
     image: gitlab/gitlab-runner:alpine
     container_name: gitlab-runner
@@ -121,29 +124,12 @@ services:
       TZ: ${TZ:-UTC}
     volumes:
       - ${RUNNER_CONFIG_PATH:-./data/runner/config}:/etc/gitlab-runner
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock  # Mount host Docker socket
     networks:
       - gitlab-network
     depends_on:
       gitlab:
         condition: service_healthy
-
-  # ===========================================
-  # DOCKER-IN-DOCKER (for building images in CI/CD)
-  # ===========================================
-  dind:
-    image: docker:dind
-    container_name: gitlab-dind
-    restart: unless-stopped
-    privileged: true
-    environment:
-      DOCKER_TLS_CERTDIR: ""  # Disable TLS for simplicity in local dev
-      DOCKER_DRIVER: overlay2
-    volumes:
-      - dind-storage:/var/lib/docker
-    networks:
-      - gitlab-network
-    command: ["--storage-driver=overlay2"]
 
 # ===========================================
 # NETWORKS
@@ -156,6 +142,4 @@ networks:
 # ===========================================
 # VOLUMES
 # ===========================================
-volumes:
-  dind-storage:
-    driver: local
+# No volumes needed for socket mounting approach
