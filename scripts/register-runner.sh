@@ -122,6 +122,20 @@ docker exec gitlab-runner gitlab-runner register \
 
 if [ $? -eq 0 ]; then
     echo ""
+    echo -e "${YELLOW}Fixing helper_image for arm64 compatibility...${NC}"
+
+    # Fix helper_image to use arm64-bleeding instead of the default non-existent arm64-vX.X.X
+    docker exec gitlab-runner sed -i 's/helper_image = .*/helper_image = "gitlab\/gitlab-runner-helper:arm64-bleeding"/' /etc/gitlab-runner/config.toml
+
+    # Also disable cache to avoid permission issues with helper image
+    docker exec gitlab-runner sed -i 's/disable_cache = false/disable_cache = true/' /etc/gitlab-runner/config.toml
+
+    # Restart runner to apply changes
+    echo -e "${YELLOW}Restarting runner to apply changes...${NC}"
+    docker restart gitlab-runner > /dev/null 2>&1
+    sleep 2
+
+    echo ""
     echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║  ✓ Runner registered successfully!                            ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
