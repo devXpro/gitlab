@@ -29,7 +29,7 @@ shutdown_timeout = 0
     volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]
     network_mode = "gitlab-network"
     shm_size = 0
-    helper_image = "gitlab/gitlab-runner-helper:x86_64-latest"
+    helper_image = "alpine:latest"
     pull_policy = ["if-not-present"]
     network_mtu = 0
 
