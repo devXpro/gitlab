@@ -8,7 +8,6 @@ data/
 
 # Runner config (contains registration tokens)
 data/runner/
-runner-config.toml
 
 # Logs
 *.log
