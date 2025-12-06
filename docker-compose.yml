@@ -97,9 +97,9 @@ services:
       - "${GITLAB_REGISTRY_PORT:-5050}:5050"
       - "${GITLAB_SSH_EXTERNAL_PORT:-2222}:22"
     volumes:
-      - ${GITLAB_HOME:-./data/gitlab}/config:/etc/gitlab
-      - ${GITLAB_HOME:-./data/gitlab}/logs:/var/log/gitlab
-      - ${GITLAB_HOME:-./data/gitlab}/data:/var/opt/gitlab
+      - ./data/gitlab/config:/etc/gitlab
+      - ./data/gitlab/logs:/var/log/gitlab
+      - ./data/gitlab/data:/var/opt/gitlab
     shm_size: '256m'
     networks:
       - gitlab-network
@@ -123,7 +123,7 @@ services:
     environment:
       TZ: ${TZ:-UTC}
     volumes:
-      - ${RUNNER_CONFIG_PATH:-./data/runner/config}:/etc/gitlab-runner
+      - ./data/runner/config:/etc/gitlab-runner
       - /var/run/docker.sock:/var/run/docker.sock  # Mount host Docker socket
     networks:
       - gitlab-network
