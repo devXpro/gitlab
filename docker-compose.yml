@@ -123,7 +123,7 @@ services:
     environment:
       TZ: ${TZ:-UTC}
     volumes:
-      - ${RUNNER_CONFIG_PATH:-./data/runner/config}:/etc/gitlab-runner
+      - ./runner-config.toml:/etc/gitlab-runner/config.toml
       - /var/run/docker.sock:/var/run/docker.sock  # Mount host Docker socket
     networks:
       - gitlab-network
